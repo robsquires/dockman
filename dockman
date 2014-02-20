@@ -1,0 +1,177 @@
+#!/bin/bash
+
+#
+#  private functions -----
+#
+
+#
+#parse_yaml - parses a given yaml file to an (optional) prefix
+#
+function parse_yaml {
+   local prefix=$2
+   local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
+   sed -ne "s|^\($s\)\($w\)$s:$s\"\(.*\)\"$s\$|\1$fs\2$fs\3|p" \
+        -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
+   awk -F$fs '{
+      indent = length($1)/2;
+      vname[indent] = $2;
+      for (i in vname) {if (i > indent) {delete vname[i]}}
+      if (length($3) > 0) {
+         vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
+
+         printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
+      }
+   }'
+}
+
+#
+# remove_container - kills and removes a container
+# 
+function remove_container {
+    local container_name=$1
+    echo "--> Stopping container: $container_name"
+    docker kill $container_name
+    docker rm $container_name
+}
+
+#
+# map_config - maps a node in the yaml config to a variable
+# exits if node not found
+# 
+function map_config {
+    node=$1
+    mapTo=$2
+
+    value=${!1}
+    if [ -z "$value" ]
+      then
+        echo "Node '$node' not found"
+        exit 1
+    fi
+
+    eval $(echo $mapTo=$value)
+}
+
+
+#
+#  ----- end private functions 
+#
+
+
+
+
+#
+# import the dockman config
+#
+
+dockmanFile='.dockman.yml'
+
+if [ ! -f "$dockmanFile" ]; then
+    echo "! Could not find $dockmanFile"
+    exit 1
+fi
+
+eval $(parse_yaml $dockmanFile) 
+
+
+#
+# import the number of workers
+#
+pCount=$1;
+: ${pCount:=1}
+
+
+#
+# import the container namespace
+#
+map_config 'namespace' 'cnt_namespace'
+
+
+
+#
+# Gearman container configuration
+#
+echo "-> CONFIGURING GEARMAN ......."
+
+gearman_cnt_image='rgarcia/gearmand'
+gearman_cnt_name=$cnt_namespace.gearman
+
+
+remove_container $gearman_cnt_name
+
+echo "--> Starting container: $gearman_cnt_name"
+docker run -d -name $gearman_cnt_name $gearman_cnt_image
+
+#gearman link names
+
+gearman_link_alias='GM'
+gearman_link_port=4730
+gearman_link_name=$gearman_cnt_name:$gearman_link_alias
+
+
+
+#
+# Application container configuration
+#
+echo "-> SETTING UP APPLICATION CONTAINER......."
+
+map_config 'data_container__image' 'data_cnt_image'
+data_cnt_name=$cnt_namespace.data
+
+remove_container $data_cnt_name
+
+echo "--> Starting data container: $data_cnt_name"
+docker run -d -name $data_cnt_name $data_cnt_image
+
+
+
+#
+# dockman-behat config
+# 
+base_cnt_cmd="./dockman-behat.sh $gearman_link_alias $gearman_link_port"
+
+
+#
+# Worker container configuration
+#
+echo "-> SETTING UP $pCount WORKER CONTAINERS......."
+
+map_config 'worker_container__image' 'worker_cnt_image'
+map_config 'worker_container__config_tpl' 'worker_cnt_config_tpl'
+
+worker_cnt_prefix=$cnt_namespace.worker-
+worker_cnt_cmd="$base_cnt_cmd behat-worker.yml $worker_cnt_config_tpl"
+
+for  i in $(docker ps -a | grep -oP "$worker_cnt_prefix\d+(?!/)")
+  do
+    remove_container $i
+done
+
+
+for (( i=1; i<=$pCount; i++ ))
+do
+    worker_cnt_name=$worker_cnt_prefix$i
+    echo "--> Creating worker container: $worker_cnt_name"
+    docker run -t -d --link $gearman_link_name  -volumes-from $data_cnt_name -name $worker_cnt_name $worker_cnt_image $worker_cnt_cmd
+done
+
+
+#
+# Client container configuration
+#
+echo "-> SETTING UP CLIENT CONTAINER + RUNNING TESTS......."
+
+map_config 'client_container__image' 'client_cnt_image'
+map_config 'client_container__config_tpl' 'client_cnt_config_tpl'
+
+client_cnt_name=$cnt_namespace.client
+client_cnt_cmd="$base_cnt_cmd  behat-worker.yml $client_cnt_config_tpl"
+
+for  i in $(docker ps -a | grep -oP "$client_cnt_name(?!/)")
+  do
+    remove_container $i
+done
+
+
+echo "--> Creating client container: $client_cnt_name"
+docker run -t -i -rm --link $gearman_link_name  -volumes-from $data_cnt_name -name $client_cnt_name $client_cnt_image $client_cnt_cmd

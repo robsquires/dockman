@@ -1,0 +1,14 @@
+namespace: rob-test
+
+data_container:
+    image: behat-docker/data
+
+worker_container:
+    image: behat-docker/exec
+    config_tpl: behat-worker.yml.tpl
+
+client_container:
+    image: behat-docker/exec
+    config_tpl: behat-worker.yml.tpl
+
+
