@@ -2,6 +2,7 @@ namespace: rob-test
 
 data_container:
     image: behat-docker/data
+    working_dir: /var/www
 
 worker_container:
     image: behat-docker/exec
@@ -9,6 +10,6 @@ worker_container:
 
 client_container:
     image: behat-docker/exec
-    config_tpl: behat-worker.yml.tpl
+    config_tpl: behat-client.yml.tpl
 
 
