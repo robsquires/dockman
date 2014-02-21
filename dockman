@@ -120,6 +120,10 @@ data_cnt_name=$cnt_namespace.data
 
 remove_container $data_cnt_name
 
+#add the dockman-behat file to the docker container via the insert command
+#url="https://raw2.github.com/robsquires/dockman/master/dockman-behat.sh"
+#docker insert $data_cnt_image $url /var/www/dockman-behat.sh
+
 echo "--> Starting data container: $data_cnt_name"
 docker run -d -name $data_cnt_name $data_cnt_image
 
@@ -152,7 +156,8 @@ for (( i=1; i<=$pCount; i++ ))
 do
     worker_cnt_name=$worker_cnt_prefix$i
     echo "--> Creating worker container: $worker_cnt_name"
-    docker run -t -d --link $gearman_link_name  -volumes-from $data_cnt_name -name $worker_cnt_name $worker_cnt_image $worker_cnt_cmd
+    echo $worker_cnt_cmd
+    docker run -d --link $gearman_link_name  -volumes-from $data_cnt_name -name $worker_cnt_name $worker_cnt_image $worker_cnt_cmd
 done
 
 
@@ -165,7 +170,7 @@ map_config 'client_container__image' 'client_cnt_image'
 map_config 'client_container__config_tpl' 'client_cnt_config_tpl'
 
 client_cnt_name=$cnt_namespace.client
-client_cnt_cmd="$base_cnt_cmd  behat-worker.yml $client_cnt_config_tpl"
+client_cnt_cmd="$base_cnt_cmd  behat-client.yml $client_cnt_config_tpl"
 
 for  i in $(docker ps -a | grep -oP "$client_cnt_name(?!/)")
   do
