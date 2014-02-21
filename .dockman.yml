@@ -1,15 +1,14 @@
-namespace: rob-test
+namespace: insert-project-name
 
 data_container:
-    image: behat-docker/data
-    working_dir: /var/www
+    image: a-data-container-name
 
 worker_container:
-    image: behat-docker/exec
+    image: the-runtime-container-name
     config_tpl: behat-worker.yml.tpl
 
 client_container:
-    image: behat-docker/exec
+    image: the-runtime-container-name
     config_tpl: behat-client.yml.tpl
 
 
