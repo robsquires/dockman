@@ -124,7 +124,7 @@ remove_container $data_cnt_name
 #url="https://raw2.github.com/robsquires/dockman/master/dockman-behat.sh"
 #docker insert $data_cnt_image $url /var/www/dockman-behat.sh
 
-echo "--> Starting data container: $data_cnt_name"
+echo "--> Starting application container: $data_cnt_name"
 docker run -d -name $data_cnt_name $data_cnt_image
 
 
@@ -156,7 +156,6 @@ for (( i=1; i<=$pCount; i++ ))
 do
     worker_cnt_name=$worker_cnt_prefix$i
     echo "--> Creating worker container: $worker_cnt_name"
-    echo $worker_cnt_cmd
     docker run -d --link $gearman_link_name  -volumes-from $data_cnt_name -name $worker_cnt_name $worker_cnt_image $worker_cnt_cmd
 done
 
