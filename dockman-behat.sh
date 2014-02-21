@@ -1,5 +1,14 @@
 #!/bin/bash
 
+
+
+## insert custom runtime commands here
+
+
+
+
+
+
 red="$(tput setaf 1)"
 yel="$(tput setaf 3)"
 blue="$(tput setaf 4)"
