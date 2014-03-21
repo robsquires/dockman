@@ -12,7 +12,7 @@
 
     - `behat-worker.yml.tpl`
 
-    - `dockman-bahat.sh`
+    - `dockman-behat.sh`
 
 3. Run `docker build -t a-data-container-name .` to create your data container
 
